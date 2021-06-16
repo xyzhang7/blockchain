@@ -2,8 +2,6 @@ from Block import Block
 import time
 
 
-
-
 class Blockchain:
     difficulty = 2
 
@@ -11,7 +9,7 @@ class Blockchain:
         """
         Constructor for the `Blockchain` class.
         """
-        self.unconfirmed_transactions = []
+        self.unconfirmed_info = []
         self.__chain = []
         self.__create_genesis_block()
 
@@ -79,8 +77,8 @@ class Blockchain:
         return (block_hash.startswith('0' * Blockchain.difficulty) and
                 block_hash == block.compute_hash())
 
-    def add_new_transaction(self, transaction):
-        self.unconfirmed_transactions.append(transaction)
+    def add_new_info(self, info):
+        self.unconfirmed_info.append(info)
 
     def mine(self):
         """
@@ -88,19 +86,30 @@ class Blockchain:
         transactions to the blockchain by adding them to the block
         and figuring out proof of work.
         """
-        if not self.unconfirmed_transactions:
+        if not self.unconfirmed_info:
             return False
 
         last_block = self.last_block
 
         new_block = Block(index=last_block.index + 1,
-                  transactions=self.unconfirmed_transactions,
-                  timestamp=time.time(),
-                  previous_hash=last_block.compute_hash())
+                          info=self.unconfirmed_info,
+                          timestamp=time.time(),
+                          previous_hash=last_block.compute_hash())
 
         proof = self.proof_of_work(new_block)
         self.add_block(new_block, proof)
-        self.unconfirmed_transactions = []
+        self.unconfirmed_info = []
         return new_block.index
 
+    def check_chain_validity(self, chain):
+        rt = True
+        previous_hash = "0"
+        for block in chain:
+            block_hash = block.hash
+            delattr(block, "hash")
+            if not self.is_valid_proof(block, block_hash) or previous_hash != block.previous_hash:
+                rt = False
+                break
+            block.hash, previous_hash = block_hash, block_hash
+        return rt
 

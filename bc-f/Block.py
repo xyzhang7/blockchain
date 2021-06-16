@@ -3,16 +3,16 @@ import json
 
 
 class Block:
-    def __init__(self, index, transactions, timestamp, previous_hash):
+    def __init__(self, index, info, timestamp, previous_hash):
         """
         Constructor for the `Block` class.
         :param index:         Unique ID of the block.
-        :param transactions:  List of transactions.
+        :param info:  List of transactions.
         :param timestamp:     Time of generation of the block.
         :param previous_hash: Hash of the previous block in the chain which this block is part of.
         """
         self.__index = index
-        self.__transactions = transactions
+        self.__info = info
         self.__timestamp = timestamp
         self.__previous_hash = previous_hash # Adding the previous hash field
         self.nonce = 0
@@ -27,8 +27,8 @@ class Block:
         return sha256(block_string.encode()).hexdigest()
 
     @property
-    def transactions(self):
-        return self.__transactions
+    def info(self):
+        return self.__info
 
     @property
     def previous_hash(self):

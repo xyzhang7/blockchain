@@ -1,47 +1,140 @@
-from flask import Flask, request
 import requests
+from flask import Flask, request
+# import requests
+import NFT
 from Blockchain import Blockchain
 from Block import Block
 import time
 import json
+import Users
+import Transactions
 
 app = Flask(__name__)
 
-blockchain = Blockchain()
+tx = Blockchain()
+users = Blockchain()
+nfts = Blockchain()
 peers = set()
 
+CONNECTED_NODE_ADDRESS = "http://127.0.0.1:5000"
+posts = []
 
-@app.route('/new_transaction', methods=['POST'])
+
+def verify_author():
+    # TODO
+    return True
+
+
+# User API
+@app.route('/users/new_user', methods=['POST'])
+def new_user():
+    if not verify_author():
+        return "Forbidden", 403
+
+    data = Users.new_users(users, request)
+
+    response = app.response_class(
+        response=json.dumps(data[0]),
+        status=data[1],
+        mimetype='application/json'
+    )
+    return response
+
+
+@app.route('/users/chain', methods=['GET'])
+def get_users_chain():
+    return Users.get_users(users)
+
+
+@app.route('/users/pending_user', methods=['GET'])
+def get_pending_user():
+    return json.dumps(users.unconfirmed_info)
+
+
+@app.route('/users/mine', methods=['GET'])
+def mine_unconfirmed_users():
+    return Users.mine_unconfirmed_users(users, peers)
+
+
+@app.route('/users/add_block', methods=['POST'])
+def users_add_block():
+    return Users.users_add_block(users, request)
+
+
+# Transaction API
+@app.route('/tx/new_transaction', methods=['POST'])
 def new_transaction():
-    tx_data = request.get_json()
-    required_fields = ["author", "content"]
-
-    for field in required_fields:
-        if not tx_data.get(field):
-            return "Invalid transaction data", 404
-
-    tx_data["timestamp"] = time.time()
-
-    blockchain.add_new_transaction(tx_data)
-
-    return "Success", 201
+    data = Transactions.new_transaction(tx, request)
+    response = app.response_class(
+        response=json.dumps(data[0]),
+        status=data[1],
+        mimetype='application/json'
+    )
+    return response
 
 
-@app.route('/chain', methods=['GET'])
+@app.route('/tx/chain', methods=['GET'])
 def get_chain():
-    chain_data = []
-    length = 0
-    for block in blockchain.chain:
-        chain_data.append(block.__dict__)
-        length = block.index
-    return json.dumps({"length": length,
-                       "peers": list(peers),
-                       "chain": chain_data})
+    return Transactions.get_chain(tx)
 
 
-@app.route('/pending_tx', methods=['GET'])
+@app.route('/tx/pending_tx', methods=['GET'])
 def get_pending_tx():
-    return json.dumps(blockchain.unconfirmed_transactions)
+    return json.dumps(tx.unconfirmed_info)
+
+
+@app.route('/tx/mine', methods=['GET'])
+def mine_unconfirmed_tx():
+    return Transactions.mine_unconfirmed_tx(tx, peers)
+
+
+@app.route('/tx/add_block', methods=['POST'])
+def tx_add_block():
+    return Transactions.tx_add_block(tx, request)
+
+
+# NFT API
+@app.route('/nfts/new_file', methods=['POST'])
+def new_nft_file():
+    data = NFT.new_file(nfts, request)
+    response = app.response_class(
+        response=json.dumps(data[0]),
+        status=data[1],
+        mimetype='application/json'
+    )
+    return response
+
+
+@app.route('/nfts/transfer', methods=['POST'])
+def transfer():
+    data = NFT.transfer(nfts, request)
+    response = app.response_class(
+        response=json.dumps(data[0]),
+        status=data[1],
+        mimetype='application/json'
+    )
+    return response
+
+
+@app.route('/nfts/chain', methods=['GET'])
+def get_nft_chain():
+    return NFT.get_chain(nfts)
+
+
+@app.route('/nfts/pending_nfts')
+def get_pending_nfts():
+    print(nfts.unconfirmed_info)
+    return json.dumps(nfts.unconfirmed_info)
+
+
+@app.route('/nfts/mine', methods=['GET'])
+def mine_unconfirmed_nfts():
+    return NFT.mine_unconfirmed_nfts(nfts, peers)
+
+
+@app.route('/nfts/add_block', methods=['POST'])
+def nft_add_block():
+    return NFT.nft_add_block(nfts, request)
 
 
 # Endpoint to add new peers to the network
@@ -95,7 +188,7 @@ def create_chain_from_dump(chain_dump):
     blockchain = Blockchain()
     for idx, block_data in enumerate(chain_dump):
         block = Block(block_data["_Block__index"],
-                      block_data["_Block__transactions"],
+                      block_data["_Block__info"],
                       block_data["_Block__timestamp"],
                       block_data["_Block__previous_hash"])
         block.nonce = block_data["nonce"]
@@ -155,7 +248,7 @@ def consensus():
             longest_chain = chain
 
     if longest_chain:
-        blockchain = longest_chain # 选择最长链
+        blockchain = longest_chain  # 选择最长链
         return True
 
     return False
@@ -166,10 +259,9 @@ def consensus():
 # and then adds it to the chain.
 @app.route('/add_block', methods=['POST'])
 def verify_and_add_block():
-
     block_data = request.get_json()
     block = Block(block_data["_Block__index"],
-                  block_data["_Block__transactions"],
+                  block_data["_Block__info"],
                   block_data["_Block__timestamp"],
                   block_data["_Block__previous_hash"])
     block.nonce = block_data["nonce"]
