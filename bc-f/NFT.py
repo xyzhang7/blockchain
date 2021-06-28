@@ -3,6 +3,12 @@ A implementation of NFTs which provides basic functionality
 to track and transfer NFTs.
 NFTs represent ownership over digital assets.
 NFTs are distinguished by `tokenId`.
+NFTS_INDEX:
+        {<public key1>:
+            {<tokenId1>: <file path1>, <tokenId2>: <file path2>, ...},
+         <public key2>:
+            {...},
+        ...}
 """
 
 import json
@@ -51,35 +57,42 @@ def new_file(nfts: Blockchain, request):
     nft_data["to"] = request.form["to"]
     nft_data["private_key"] = request.form["private_key"]
 
-    # TODO: check if an NFT is original
-    # TODO: chunk large file
-
-    # Verify ownership
-    print("to: ", nft_data["to"])
-    print("hash data: ", hash_data(nft_data["private_key"]))
-    if nft_data["to"] != hash_data(nft_data["private_key"]):
-        return "Forbidden", 403
-    del nft_data["private_key"]
-
-    filename = secure_filename(file.filename)
-    file.save(os.path.join(upload_folder, filename))
     file.seek(0)
     file_binary_data = file.read()
+    nft_data["tokenId"] = hash_data(file_binary_data)
+
+    # Check if the NFT is original
+    if any(nft_data["tokenId"] in bc_d.keys() for bc_d in nfts.bc_idx.values()):
+        return "The NFT is not original", 403
+
+    # Verify ownership
+    if nft_data["to"] != hash_data(nft_data["private_key"]):
+        return "Forbidden", 402
+    del nft_data["private_key"]
+
+    # TODO: chunk large file and save data blocks
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(upload_folder, filename)
+    file.save(filepath)
 
     nft_data["timestamp"] = time.time()
-    nft_data["tokenId"] = hash_data(file_binary_data)
+
+    # Update index
+    nfts.bc_idx[nft_data["to"]][nft_data["tokenId"]] = filepath
 
     nfts.add_new_info(nft_data)
     return "Success", 201
 
 
-def balanceOf(owner):
+def balanceOf(nfts: Blockchain, owner):
     """
     Get all NFTs assigned to `owner`
     """
     # TODO: check if valid owner ID
-    # TODO: retrieve all NFTs of the owner
-    pass
+    NFTs = []
+    for _, v in nfts.bc_idx[owner]:
+        NFTs.append(v)
+    return NFTs
 
 
 def ownerOf(nfts: Blockchain, tokenId):
@@ -120,14 +133,20 @@ def transfer(nfts: Blockchain, request):
     print("owner", owner)
 
     # verify if the owner authorize the transaction
-    print("from", nft_data["from"])
-    print("hash", hash_data(nft_data["private_key"]))
     if nft_data["from"] != hash_data(nft_data["private_key"]) or \
             owner != nft_data["from"]:
         return "Forbidden", 403
     del nft_data["private_key"]
 
     nft_data["timestamp"] = time.time()
+
+    # Update index
+    filepath = nfts.bc_idx[nft_data["from"]][nft_data["tokenId"]]
+    del nfts.bc_idx[nft_data["from"]][nft_data["tokenId"]]
+    # check if exist
+    if nft_data["tokenId"] in nfts.bc_idx[nft_data["from"]]:
+        print("Transfer failure")
+    nfts.bc_idx[nft_data["to"]][nft_data["tokenId"]] = filepath
 
     nfts.add_new_info(nft_data)
     return "Success", 201
@@ -185,7 +204,8 @@ def nft_add_block(nfts: Blockchain, request):
     block = Block(block_data["_Block__index"],
                   block_data["_Block__info"],
                   block_data["_Block__timestamp"],
-                  block_data["_Block__previous_hash"])
+                  block_data["_Block__previous_hash"],
+                  block_data["_Block__previous_idx_hash"])
     block.nonce = block_data["nonce"]
     proof = block.compute_hash()
     added = nfts.add_block(block, proof)

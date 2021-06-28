@@ -1,13 +1,17 @@
+import json
+import os
 import requests
+import time
+
 from flask import Flask, request
-# import requests
+
+import config
 import NFT
 from Blockchain import Blockchain
 from Block import Block
-import time
-import json
 import Users
 import Transactions
+
 
 app = Flask(__name__)
 
@@ -18,6 +22,9 @@ peers = set()
 
 CONNECTED_NODE_ADDRESS = "http://127.0.0.1:5000"
 posts = []
+
+tx.op = os.path.join(config.UPLOAD_FOLDER, config.TRANSACTION_INDEX)
+nfts.op = os.path.join(config.UPLOAD_FOLDER, config.NFT_INDEX)
 
 
 def verify_author():
@@ -116,11 +123,6 @@ def transfer():
     return response
 
 
-@app.route('/nfts/chain', methods=['GET'])
-def get_nft_chain():
-    return NFT.get_chain(nfts)
-
-
 @app.route('/nfts/pending_nfts')
 def get_pending_nfts():
     print(nfts.unconfirmed_info)
@@ -130,6 +132,11 @@ def get_pending_nfts():
 @app.route('/nfts/mine', methods=['GET'])
 def mine_unconfirmed_nfts():
     return NFT.mine_unconfirmed_nfts(nfts, peers)
+
+
+@app.route('/nfts/chain', methods=['GET'])
+def get_nft_chain():
+    return NFT.get_chain(nfts)
 
 
 @app.route('/nfts/add_block', methods=['POST'])

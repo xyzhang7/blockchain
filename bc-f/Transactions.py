@@ -1,3 +1,12 @@
+"""
+TRANSACTION_INDEX:
+        {(<donator1 public key, recipient1 public key>):
+            {"value": <value1>, "description": <description1>},
+         (<donator2 public key, recipient2 public key>):
+            {"value": <value2>, "description": <description2>},
+        ...}
+"""
+
 from Blockchain import Blockchain
 import time
 import json
@@ -21,6 +30,9 @@ def new_transaction(tx: Blockchain, request):
 
     del tx_data["private_key"]
     tx_data["timestamp"] = time.time()
+
+    # Update index
+    tx.bc_idx[(tx_data["from"], tx_data["to"])].append((tx_data["value"], tx_data["description"]))
 
     tx.add_new_info(tx_data)
     return "Success", 201
@@ -84,7 +96,8 @@ def tx_add_block(tx: Blockchain, request):
     block = Block(block_data["_Block__index"],
                   block_data["_Block__info"],
                   block_data["_Block__timestamp"],
-                  block_data["_Block__previous_hash"])
+                  block_data["_Block__previous_hash"],
+                  block_data["_Block__previous_idx_hash"])
     block.nonce = block_data["nonce"]
 
     proof = block.compute_hash()
